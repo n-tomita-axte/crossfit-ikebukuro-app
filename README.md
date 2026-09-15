@@ -29,6 +29,7 @@ Next.js 14 (App Router) + Supabase。3つのプログラム（CrossFit / HYROX /
    4. `04_seed_templates.sql` … コーチが使う「型」のひな形
    5. `05_admin_functions.sql` … **今回追加したファイル**。`role_changes`監査ログに実際に書き込む処理が
       元のSQLに無かったため、「役割変更」と「監査ログ記録」を1つの関数にまとめて追加しました
+   6. `06_fix_grants.sql` … **`drop schema public cascade`を実行した場合は必須**。詳細は下記「トラブルシューティング」参照
 3. **Authentication > Providers** で `Email` が有効になっていることを確認
 4. **Project Settings > API** から `Project URL` と `anon public` キーをコピー
 
@@ -69,7 +70,33 @@ npm run dev
 3. Environment Variables に `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 4. Deploy → `https://xxxx.vercel.app` のようなURLが発行されます
 
-## 画面構成
+## トラブルシューティング
+
+### ログインはできるのに、WOD一覧やプロフィールが何も表示されない
+
+ブラウザの開発者ツールでエラーが出ないまま、ボードのプログラムタブが空になったり、
+`/settings`の表示名が空欄になったりする場合、**Postgresの権限(GRANT)が欠けている**可能性が高いです。
+
+これは、`profiles`テーブルなどの衝突を解消するために
+
+```sql
+drop schema public cascade;
+create schema public;
+```
+
+を実行した場合に起こります。Supabaseがプロジェクト作成時に自動設定している
+「`authenticated`ロールが各テーブルを読み書きできる」という土台の権限(GRANT)が、
+このコマンドで一緒に失われてしまうためです。RLS（`02_rls.sql`）は「どの行を見せるか」を
+制御するだけで、その前提となる「そのテーブルに触れてよいか」という権限は別に必要です。
+
+**対処**: `supabase/06_fix_grants.sql`をSQL Editorで実行してください。
+`drop schema public cascade`を実行していない場合は、このファイルは不要です
+（通常のSupabaseプロジェクトには最初から必要な権限が設定されています）。
+
+見分け方: ブラウザの開発者ツールではなく、アプリのコード側で一時的にエラー内容を
+画面に出して確認すると、`permission denied for table xxx`という形でこのエラーが見えます。
+
+
 
 - `/board` … 会員向け。プログラムタブ + 日付ナビ + その日のWOD一覧
 - `/w/[id]` … WOD詳細。記録入力（スコアタイプに応じて入力欄が変化）、コーチへのメモ、自分だけのメモ、結果ボード（ランキング、男女フィルタ）

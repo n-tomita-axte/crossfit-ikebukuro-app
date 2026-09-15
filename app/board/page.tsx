@@ -15,17 +15,12 @@ export default async function BoardPage({
   const { supabase, user, profile } = await getSessionProfile();
   if (!user) redirect("/login");
 
-  const { data: programsData, error: programsError } = await supabase
+  const { data: programsData } = await supabase
     .from("programs")
     .select("*")
     .eq("active", true)
     .order("sort_order");
   const programs = (programsData as Program[]) ?? [];
-
-  const {
-    data: { user: rawUser },
-    error: userError,
-  } = await supabase.auth.getUser();
 
   const activeProgram = searchParams.program ?? programs[0]?.id ?? "crossfit";
   const date = searchParams.date ?? todayJst();
@@ -56,16 +51,6 @@ export default async function BoardPage({
       <Header profile={profile} active="board" />
 
       <div className="mx-auto max-w-3xl px-4 py-6">
-        {/* TEMP DEBUG — remove once the empty-programs issue is diagnosed */}
-        <pre className="mb-4 whitespace-pre-wrap rounded-lg border border-plate-yellow bg-plate-yellow/10 p-3 text-xs text-plate-yellow">
-{`user.id: ${user.id}
-profile: ${profile ? JSON.stringify(profile) : "null"}
-rawUser (auth.getUser): ${rawUser ? rawUser.id : "null"}
-userError: ${userError ? userError.message : "none"}
-programs count: ${programs.length}
-programsError: ${programsError ? JSON.stringify(programsError) : "none"}`}
-        </pre>
-
         <ProgramTabs programs={programs} active={activeProgram} date={date} />
 
         <div className="mt-4">
