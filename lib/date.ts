@@ -7,17 +7,18 @@ export function todayJst(): string {
 }
 
 export function addDays(dateStr: string, delta: number): string {
-  const d = new Date(`${dateStr}T00:00:00+09:00`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
 }
 
 const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
 export function formatDateJa(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00+09:00`);
-  const wd = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
-  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日 (${WEEKDAYS_JA[wd]})`;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${m}月${d}日 (${WEEKDAYS_JA[wd]})`;
 }
 
 export function formatSecondsAsClock(totalSeconds: number): string {
