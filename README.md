@@ -31,7 +31,15 @@ Next.js 14 (App Router) + Supabase。3つのプログラム（CrossFit / HYROX /
       元のSQLに無かったため、「役割変更」と「監査ログ記録」を1つの関数にまとめて追加しました
    6. `06_fix_grants.sql` … **`drop schema public cascade`を実行した場合は必須**。詳細は下記「トラブルシューティング」参照
 3. **Authentication > Providers** で `Email` が有効になっていることを確認
-4. **Project Settings > API** から `Project URL` と `anon public` キーをコピー
+4. **マジックリンクログインを使う場合は必須**: **Authentication > URL Configuration** を開き、
+   `Redirect URLs` に以下を追加してください(本番URL・ローカル開発URLの両方)
+   ```
+   https://<あなたのVercelドメイン>/auth/callback
+   http://localhost:3000/auth/callback
+   ```
+   これを登録していないと、メールのリンクをタップしてもログインが完了せず、
+   `/login?error=auth`(リンクが無効というエラー)に戻されてしまいます。
+5. **Project Settings > API** から `Project URL` と `anon public` キーをコピー
 
 ### 最初の管理者を作る（重要）
 
@@ -98,6 +106,10 @@ create schema public;
 
 
 
+- `/login` … ログイン。既定はマジックリンク（メールアドレスだけでログインリンクを送信）、
+  「パスワードでログインする」で従来のメール+パスワード方式にも切り替え可能
+- `/auth/callback` … マジックリンクのメール内リンクをタップした後、セッションを確立してから
+  `/board`へ転送するルート（画面としては表示されません）
 - `/board` … 会員向け。プログラムタブ + 日付ナビ + その日のWOD一覧
 - `/w/[id]` … WOD詳細。記録入力（スコアタイプに応じて入力欄が変化）、コーチへのメモ、自分だけのメモ、結果ボード（ランキング、男女フィルタ）
 - `/settings` … 表示名・性別区分・既定のスケーリングの設定

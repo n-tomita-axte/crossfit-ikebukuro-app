@@ -1,44 +1,51 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PasswordAuthForm from "@/components/PasswordAuthForm";
 
 export default function LoginPage() {
-  const router = useRouter();
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const linkExpired = searchParams.get("error") === "auth";
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [authMethod, setAuthMethod] = useState<"magic" | "password">("magic");
+
+  // --- magic link state ---
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSendMagicLink(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setInfo(null);
-    setLoading(true);
+    setSending(true);
 
-    if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      setLoading(false);
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      router.push("/");
-      router.refresh();
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      setLoading(false);
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      setInfo("確認メールを送信しました。メール内のリンクを開いてから、ログインしてください。");
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    setSending(false);
+
+    if (error) {
+      setError(error.message);
+      return;
     }
+
+    setSent(true);
   }
 
   return (
@@ -51,43 +58,68 @@ export default function LoginPage() {
           会員向け WOD記録アプリ
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input
-            type="email"
-            required
-            placeholder="メールアドレス"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-xl border border-concrete-600 bg-concrete-800 px-4 py-3 text-chalk-100 placeholder:text-chalk-500 focus:border-plate-yellow focus:outline-none"
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            placeholder="パスワード"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-xl border border-concrete-600 bg-concrete-800 px-4 py-3 text-chalk-100 placeholder:text-chalk-500 focus:border-plate-yellow focus:outline-none"
-          />
+        {linkExpired && (
+          <p className="mb-4 rounded-lg border border-plate-red/40 bg-plate-red/10 p-3 text-center text-sm text-plate-red">
+            リンクの有効期限が切れているか、既に使用されています。もう一度送信してください。
+          </p>
+        )}
 
-          {error && <p className="text-sm text-plate-red">{error}</p>}
-          {info && <p className="text-sm text-plate-green">{info}</p>}
+        {authMethod === "magic" ? (
+          sent ? (
+            <div className="rounded-xl border border-plate-green/40 bg-plate-green/10 p-4 text-center">
+              <p className="text-sm text-chalk-100">
+                <span className="font-semibold text-plate-green">{email}</span> 宛にログイン用のリンクを送信しました。
+              </p>
+              <p className="mt-2 text-xs text-chalk-500">
+                メールを開いて「ログインする」リンクをタップしてください。届かない場合は迷惑メールフォルダもご確認ください。
+              </p>
+              <button
+                type="button"
+                onClick={() => setSent(false)}
+                className="mt-4 text-sm text-chalk-500 hover:text-chalk-300"
+              >
+                別のメールアドレスで送り直す
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSendMagicLink} className="flex flex-col gap-3">
+              <input
+                type="email"
+                required
+                placeholder="メールアドレス"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="rounded-xl border border-concrete-600 bg-concrete-800 px-4 py-3 text-chalk-100 placeholder:text-chalk-500 focus:border-plate-yellow focus:outline-none"
+              />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 rounded-xl bg-plate-red py-3 font-display text-base font-semibold tracking-wide text-chalk-100 disabled:opacity-50"
-          >
-            {loading ? "処理中…" : mode === "signin" ? "ログイン" : "アカウント作成"}
-          </button>
-        </form>
+              {error && <p className="text-sm text-plate-red">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={sending}
+                className="mt-2 rounded-xl bg-plate-red py-3 font-display text-base font-semibold tracking-wide text-chalk-100 disabled:opacity-50"
+              >
+                {sending ? "送信中…" : "ログインリンクを送信"}
+              </button>
+              <p className="text-center text-xs text-chalk-500">
+                パスワードは不要です。届いたメールのリンクからログインできます。
+              </p>
+            </form>
+          )
+        ) : (
+          <PasswordAuthForm />
+        )}
 
         <button
           type="button"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="mt-4 w-full text-center text-sm text-chalk-500 hover:text-chalk-300"
+          onClick={() => {
+            setAuthMethod(authMethod === "magic" ? "password" : "magic");
+            setSent(false);
+            setError(null);
+          }}
+          className="mt-6 w-full text-center text-sm text-chalk-500 hover:text-chalk-300"
         >
-          {mode === "signin" ? "アカウントを作成する" : "すでにアカウントをお持ちの方はこちら"}
+          {authMethod === "magic" ? "パスワードでログインする" : "メールのリンクでログインする"}
         </button>
       </div>
     </main>
