@@ -3,20 +3,27 @@
 Next.js 14 (App Router) + Supabase。3つのプログラム（CrossFit / HYROX / CF40）の
 日々のWODを会員が見て、結果を記録し、コーチが入稿・管理するアプリです。
 
-## 権限モデル
+## 権限モデル（役割と操作権限を分離、`08_role_permission_separation.sql`以降）
 
-`profiles.role` で3種類。RLS（Row Level Security）がすべての実データアクセスを守っているので、
-画面側のガードが漏れていてもDB側で弾かれます。
+「**役割**（表示上の立場）」と「**操作権限**（何ができるか）」を分けています。
+コーチが管理操作を持っても、表示・機能は「コーチ」のまま変わりません。
 
-- **member（会員）**: 公開済みのWODの閲覧、自分の記録・メモの読み書き、結果ボードの閲覧
-- **coach（コーチ）**: 上記に加えてWODの下書き作成・公開、コーチ間の申し送り、
-  会員のコーチ宛メモの閲覧（本人専用メモは見えません）
-- **admin（管理者）**: 上記すべて + 会員の役割変更（`role_changes`に監査ログが残ります）
+- `profiles.role` … **member（会員）** / **coach（コーチ）** の2値。WODの下書き作成・公開、
+  コーチ間の申し送りができるかは、この`role`が`coach`かどうかで決まります
+- `permissions`テーブル … `role`とは独立した権限。今のところ`manage_roles`（役割変更・権限付与ができる、
+  旧`admin`相当）のみ使用。`/admin`画面から付与・剥奪できます
+
+RLS（Row Level Security）がすべての実データアクセスを守っているので、画面側のガードが
+漏れていてもDB側で弾かれます。`is_coach()` / `is_admin()`というSQL関数名は旧バージョンから
+変えていませんが、中身は新しい権限モデルを見るように差し替えています（`02_rls.sql`のポリシー自体は無修正）。
+
+- `is_coach()` … `role = 'coach'` または `manage_roles`権限を持つ
+- `is_admin()` … `manage_roles`権限を持つ（`role`は見ない）
 
 メモは2種類に分かれています（`01_schema.sql`のコメントの通り、テーブルを分けているのは
 「見せる相手が違うメモを同じ行に置くと、点数を見せるために行ごと開放したときにメモも一緒に漏れる」ため）。
 
-- `result_coach_notes` … 本人 + コーチ・管理者が見られる
+- `result_coach_notes` … 本人 + コーチ（`is_coach()`が真の人）が見られる
 - `result_private_notes` … 本人だけ
 
 ## 1. Supabaseのセットアップ
@@ -30,8 +37,11 @@ Next.js 14 (App Router) + Supabase。3つのプログラム（CrossFit / HYROX /
    5. `05_admin_functions.sql` … **今回追加したファイル**。`role_changes`監査ログに実際に書き込む処理が
       元のSQLに無かったため、「役割変更」と「監査ログ記録」を1つの関数にまとめて追加しました
    6. `06_fix_grants.sql` … **`drop schema public cascade`を実行した場合は必須**。詳細は下記「トラブルシューティング」参照
-   7. `07_onboarding.sql` … **今回追加したファイル**。初回ログイン時に表示名を登録してもらう
-      オンボーディング画面のためのフラグ（`profiles.onboarded`）を追加します
+   7. `07_onboarding.sql` … 初回ログイン時に表示名を登録してもらうオンボーディング画面のための
+      フラグ（`profiles.onboarded`）を追加します
+   8. `08_role_permission_separation.sql` … **今回追加したファイル**。「役割」と「操作権限」を分離します。
+      既存の`role='admin'`のユーザーは自動的に`role='coach'` + `manage_roles`権限に移行され、
+      できることは変わりません
 3. **Authentication > Providers** で `Email` が有効になっていることを確認
 4. **マジックリンクログインを使う場合は必須**: **Authentication > URL Configuration** を開き、
    `Redirect URLs` に以下を追加してください(本番URL・ローカル開発URLの両方)
@@ -43,26 +53,29 @@ Next.js 14 (App Router) + Supabase。3つのプログラム（CrossFit / HYROX /
    `/login?error=auth`(リンクが無効というエラー)に戻されてしまいます。
 5. **Project Settings > API** から `Project URL` と `anon public` キーをコピー
 
-### 最初の管理者を作る（重要）
+### 最初の「管理操作を行える人」を作る（重要）
 
-`admin_set_role`関数は「管理者だけが呼べる」ため、最初の管理者はSQL Editorから直接作る必要があります。
-アプリでサインアップした後、そのアカウントのユーザーIDを確認して実行してください。
+`admin_grant_permission`関数は「既に`manage_roles`権限を持つ人だけが呼べる」ため、
+最初の1人だけはSQL Editorから直接権限を付与する必要があります。
+アプリでログイン（サインアップ）した後、そのアカウントのユーザーIDを確認して実行してください。
 
-`profiles`テーブルには「`role`列の変更は管理者にしか許可しない」という`guard_role_change`トリガーが
-付いています。SQL Editorから実行する場合は「ログイン中のユーザー」が存在しないため、このトリガーに
-ブロックされてしまいます。**最初の1人だけ**、トリガーを一時的に止めてから更新してください。
+`profiles`テーブルの`role`列には、`manage_roles`権限を持つ人にしか変更を許可しない
+`guard_role_change`トリガーが付いています（`role`の変更と権限付与は別物なので、
+今回はこのトリガー自体には引っかかりません）。
 
 ```sql
 -- Authentication > Users でIDを確認するか、以下で表示名から検索
 select id, display_name from public.profiles where display_name = 'あなたの表示名';
 
-alter table public.profiles disable trigger profiles_guard_role;
-update public.profiles set role = 'admin' where id = 'コピーしたUUID';
-alter table public.profiles enable trigger profiles_guard_role;
+insert into public.permissions (user_id, permission_key)
+values ('コピーしたUUID', 'manage_roles')
+on conflict (user_id, permission_key) do nothing;
 ```
 
-2人目以降の役割変更は、アプリの`/admin`画面（`admin_set_role`関数経由）で行ってください。
-そちらは`role_changes`に監査ログも残ります。
+これで、そのアカウントは`/admin`画面（役割変更・管理操作の付与/剥奪）にアクセスできるようになります。
+`role`（会員/コーチ）はそのままなので、コーチとしての表示・機能は変わりません。
+2人目以降の役割変更・権限付与は、アプリの`/admin`画面から行ってください
+（役割変更は`role_changes`に、権限の付与・剥奪は`permission_changes`に、それぞれ監査ログが残ります）。
 
 ## 2. ローカルで動かす
 
@@ -117,15 +130,15 @@ create schema public;
 - `/board` … 会員向け。プログラムタブ + 日付ナビ + その日のWOD一覧
 - `/w/[id]` … WOD詳細。記録入力（スコアタイプに応じて入力欄が変化）、コーチへのメモ、自分だけのメモ、結果ボード（ランキング、男女フィルタ）
 - `/settings` … 表示名・性別区分・既定のスケーリングの設定
-- `/coach` … コーチ・管理者向け。プログラム/日付ごとのWOD一覧（下書き含む）、新規作成
+- `/coach` … コーチ、または`manage_roles`権限を持つ人向け。プログラム/日付ごとのWOD一覧（下書き含む）、新規作成
 - `/coach/workouts/[id]` … WOD作成・編集（`id=new`で新規、ひな形から読み込み可、削除も可能）
 - `/coach/handovers` … コーチ間の申し送り（会員には存在ごと見えません）
-- `/admin` … 管理者向け。会員の役割変更
+- `/admin` … `manage_roles`権限を持つ人向け。役割（会員/コーチ）の変更と、`manage_roles`権限の付与・剥奪
 
 ### コーチによる代理記録
 
-`/w/[id]`のWOD詳細画面に、コーチ・管理者だけに見える「コーチ用：会員の代わりに記録する」ボタンがあります。
-`02_rls.sql`の`results_coach_write`ポリシーに基づく機能です。
+`/w/[id]`のWOD詳細画面に、コーチ（または`manage_roles`権限を持つ人）だけに見える
+「コーチ用：会員の代わりに記録する」ボタンがあります。`02_rls.sql`の`results_coach_write`ポリシーに基づく機能です。
 
 - 会員を選んでスコア・スケーリングを代理入力できます
 - **コーチへのメモ・自分だけのメモは代理入力できません**。`result_coach_notes`・`result_private_notes`の
@@ -135,7 +148,7 @@ create schema public;
 ### WODの削除
 
 `/coach/workouts/[id]`の編集画面下部から削除できます。`02_rls.sql`の`workouts_delete`ポリシー
-（管理者、または登録した本人のみ削除可）に従い、条件を満たさない場合はボタン自体を表示しません。
+（`manage_roles`権限を持つ人、または登録した本人のみ削除可）に従い、条件を満たさない場合はボタン自体を表示しません。
 
 ## スコアタイプごとの入力
 

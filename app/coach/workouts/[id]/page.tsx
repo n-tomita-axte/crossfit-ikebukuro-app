@@ -12,9 +12,9 @@ export default async function WorkoutEditorPage({
   params: { id: string };
   searchParams: { program?: string; date?: string };
 }) {
-  const { supabase, user, profile } = await getSessionProfile();
+  const { supabase, user, profile, canManage } = await getSessionProfile();
   if (!user) redirect("/login");
-  if (!profile || (profile.role !== "coach" && profile.role !== "admin")) redirect("/board");
+  if (!profile || (profile.role !== "coach" && !canManage)) redirect("/board");
 
   const { data: programsData } = await supabase
     .from("programs")
@@ -44,7 +44,7 @@ export default async function WorkoutEditorPage({
 
   return (
     <main className="min-h-screen bg-concrete-900 pb-16">
-      <Header profile={profile} active="coach" />
+      <Header profile={profile} canManage={canManage} active="coach" />
       <div className="mx-auto max-w-2xl px-4 py-6">
         <h1 className="mb-6 font-display text-2xl tracking-wide text-chalk-100">
           {workout ? "WODを編集" : "WODを新規作成"}
@@ -55,7 +55,7 @@ export default async function WorkoutEditorPage({
           workout={workout}
           defaults={defaults}
           userId={user.id}
-          canDelete={profile.role === "admin" || workout?.created_by === user.id}
+          canDelete={canManage || workout?.created_by === user.id}
         />
       </div>
     </main>

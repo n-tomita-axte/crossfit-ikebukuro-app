@@ -9,7 +9,7 @@ import { SCORE_TYPE_LABEL } from "@/lib/supabase/types";
 import type { Profile, ResultCoachNote, ResultPrivateNote, ResultRow, ResultWithProfile, Workout } from "@/lib/supabase/types";
 
 export default async function WorkoutPage({ params }: { params: { id: string } }) {
-  const { supabase, user, profile } = await getSessionProfile();
+  const { supabase, user, profile, canManage } = await getSessionProfile();
   if (!user) redirect("/login");
 
   const { data: workout } = await supabase
@@ -57,7 +57,7 @@ export default async function WorkoutPage({ params }: { params: { id: string } }
     leaderboard = (data as ResultWithProfile[]) ?? [];
   }
 
-  const isCoach = profile?.role === "coach" || profile?.role === "admin";
+  const isCoach = profile?.role === "coach" || canManage;
   let members: Pick<Profile, "id" | "display_name">[] = [];
   if (isCoach) {
     const { data } = await supabase
@@ -70,7 +70,7 @@ export default async function WorkoutPage({ params }: { params: { id: string } }
 
   return (
     <main className="min-h-screen bg-concrete-900 pb-16">
-      <Header profile={profile} active="board" />
+      <Header profile={profile} canManage={canManage} active="board" />
 
       <div className="mx-auto max-w-2xl px-4 py-6">
         <p className="text-sm text-chalk-500">{formatDateJa(w.date)}</p>

@@ -13,9 +13,9 @@ export default async function CoachPage({
 }: {
   searchParams: { program?: string; date?: string };
 }) {
-  const { supabase, user, profile } = await getSessionProfile();
+  const { supabase, user, profile, canManage } = await getSessionProfile();
   if (!user) redirect("/login");
-  if (!profile || (profile.role !== "coach" && profile.role !== "admin")) redirect("/board");
+  if (!profile || (profile.role !== "coach" && !canManage)) redirect("/board");
 
   const { data: programsData } = await supabase
     .from("programs")
@@ -37,7 +37,7 @@ export default async function CoachPage({
 
   return (
     <main className="min-h-screen bg-concrete-900 pb-16">
-      <Header profile={profile} active="coach" />
+      <Header profile={profile} canManage={canManage} active="coach" />
 
       <div className="mx-auto max-w-3xl px-4 py-6">
         <div className="flex items-center justify-between">

@@ -1,7 +1,8 @@
-export type Role = "member" | "coach" | "admin";
+export type Role = "member" | "coach";
 export type GenderDivision = "men" | "women" | null;
 export type ScoreType = "weight" | "time" | "reps" | "rounds_reps" | "completion";
 export type ScalingLevel = "RX" | "Scaled";
+export type PermissionKey = "manage_roles";
 
 export interface Profile {
   id: string;
@@ -98,6 +99,22 @@ export interface RoleChange {
   target_id: string;
   from_role: string;
   to_role: string;
+  changed_by: string | null;
+  changed_at: string;
+}
+
+export interface Permission {
+  user_id: string;
+  permission_key: PermissionKey;
+  granted_by: string | null;
+  granted_at: string;
+}
+
+export interface PermissionChange {
+  id: string;
+  target_id: string;
+  permission_key: PermissionKey;
+  action: "granted" | "revoked";
   changed_by: string | null;
   changed_at: string;
 }

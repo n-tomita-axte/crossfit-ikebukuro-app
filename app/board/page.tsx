@@ -12,7 +12,7 @@ export default async function BoardPage({
 }: {
   searchParams: { program?: string; date?: string };
 }) {
-  const { supabase, user, profile } = await getSessionProfile();
+  const { supabase, user, profile, canManage } = await getSessionProfile();
   if (!user) redirect("/login");
 
   const { data: programsData } = await supabase
@@ -48,7 +48,7 @@ export default async function BoardPage({
 
   return (
     <main className="min-h-screen bg-concrete-900 pb-16">
-      <Header profile={profile} active="board" />
+      <Header profile={profile} canManage={canManage} active="board" />
 
       <div className="mx-auto max-w-3xl px-4 py-6">
         <ProgramTabs programs={programs} active={activeProgram} date={date} />

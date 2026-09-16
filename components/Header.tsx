@@ -4,13 +4,15 @@ import { signOut } from "@/app/actions";
 
 export default function Header({
   profile,
+  canManage,
   active,
 }: {
   profile: Profile | null;
+  canManage: boolean;
   active: "board" | "coach" | "admin" | "settings" | "none";
 }) {
-  const isCoach = profile?.role === "coach" || profile?.role === "admin";
-  const isAdmin = profile?.role === "admin";
+  const isCoach = profile?.role === "coach" || canManage;
+  const isAdmin = canManage;
 
   return (
     <header className="sticky top-0 z-20 border-b border-concrete-700 bg-concrete-900/95 backdrop-blur">

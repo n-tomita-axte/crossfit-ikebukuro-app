@@ -1,5 +1,8 @@
 # 役割と操作権限の分離 ― 設計案
 
+> **追記**: 案Bで進めることが決まり、`supabase/08_role_permission_separation.sql`として実装済みです。
+> 以下は判断時点の提案内容です。
+
 ## 背景・課題
 
 現状の`profiles.role`は、`member` / `coach` / `admin`の3値で、

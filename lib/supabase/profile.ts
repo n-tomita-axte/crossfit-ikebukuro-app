@@ -9,7 +9,7 @@ export async function getSessionProfile() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { supabase, user: null, profile: null as Profile | null };
+    return { supabase, user: null, profile: null as Profile | null, canManage: false };
   }
 
   const { data: profile } = await supabase
@@ -18,5 +18,17 @@ export async function getSessionProfile() {
     .eq("id", user.id)
     .maybeSingle();
 
-  return { supabase, user, profile: (profile as Profile) ?? null };
+  const { data: permission } = await supabase
+    .from("permissions")
+    .select("permission_key")
+    .eq("user_id", user.id)
+    .eq("permission_key", "manage_roles")
+    .maybeSingle();
+
+  return {
+    supabase,
+    user,
+    profile: (profile as Profile) ?? null,
+    canManage: !!permission,
+  };
 }
