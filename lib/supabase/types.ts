@@ -10,6 +10,7 @@ export interface Profile {
   role: Role;
   default_scaling: string;
   avatar_url: string | null;
+  onboarded: boolean;
   created_at: string;
 }
 

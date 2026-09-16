@@ -30,6 +30,8 @@ Next.js 14 (App Router) + Supabase。3つのプログラム（CrossFit / HYROX /
    5. `05_admin_functions.sql` … **今回追加したファイル**。`role_changes`監査ログに実際に書き込む処理が
       元のSQLに無かったため、「役割変更」と「監査ログ記録」を1つの関数にまとめて追加しました
    6. `06_fix_grants.sql` … **`drop schema public cascade`を実行した場合は必須**。詳細は下記「トラブルシューティング」参照
+   7. `07_onboarding.sql` … **今回追加したファイル**。初回ログイン時に表示名を登録してもらう
+      オンボーディング画面のためのフラグ（`profiles.onboarded`）を追加します
 3. **Authentication > Providers** で `Email` が有効になっていることを確認
 4. **マジックリンクログインを使う場合は必須**: **Authentication > URL Configuration** を開き、
    `Redirect URLs` に以下を追加してください(本番URL・ローカル開発URLの両方)
@@ -110,6 +112,8 @@ create schema public;
   「パスワードでログインする」で従来のメール+パスワード方式にも切り替え可能
 - `/auth/callback` … マジックリンクのメール内リンクをタップした後、セッションを確立してから
   `/board`へ転送するルート（画面としては表示されません）
+- `/onboarding` … 初回ログイン時（`profiles.onboarded = false`の間）、他のどの画面より先に
+  案内される表示名登録画面。登録が終わると`onboarded = true`になり、以降は表示されません
 - `/board` … 会員向け。プログラムタブ + 日付ナビ + その日のWOD一覧
 - `/w/[id]` … WOD詳細。記録入力（スコアタイプに応じて入力欄が変化）、コーチへのメモ、自分だけのメモ、結果ボード（ランキング、男女フィルタ）
 - `/settings` … 表示名・性別区分・既定のスケーリングの設定

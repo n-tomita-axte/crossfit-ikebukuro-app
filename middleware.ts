@@ -28,7 +28,27 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+  const exemptPaths = ["/onboarding", "/login", "/auth/callback"];
+  const isExempt = exemptPaths.some((p) => pathname.startsWith(p));
+
+  if (user && !isExempt) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarded")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile && profile.onboarded === false) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
+  }
 
   return response;
 }
